@@ -1,0 +1,43 @@
+name: Merge to Prod
+on:
+    workflow_run:
+        workflows: ["Testing"]
+        types: 
+            - completed
+    pull_request:
+        types:
+            - closed
+jobs:
+    echo-if-merged:
+        if: github.event.pull_request.merged == true
+        runs-on: ubuntu-latest
+        environment: Prod
+        steps: 
+            - name: Pull Request merged!
+              run: echo "Pull Request merged!"
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Checking all files are correct
+              run: ls -la; chmod u+x version.sh
+            - name: Modify version file
+              run: ./version.sh; cat version.txt
+            - name: Set up Git identity
+              run: |
+                git config --global user.name "${{ secrets.GIT_USERNAME }}"
+                git config --global user.email "${{ secrets.GIT_USEREMAIL }}"
+            - name: Read version from text file
+              run: |
+                VERSION=$(cat version.txt)
+                echo "VERSION=$VERSION" >> $GITHUB_ENV; cat version.txt
+            - name: Commit updated version
+              run: |
+                cat version.txt
+                git pull
+                git add version.txt
+                git commit -m "Update version to ${{ env.VERSION }}"
+                git push
+            - name: Create git tag
+              run: |
+                cat version.txt
+                git tag -a "v$VERSION" -m "Release $VERSION"
+                git push origin "v$VERSION"
